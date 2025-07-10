@@ -24,5 +24,5 @@ jobs:
           identity: "720909c9f5279097d847ad02a2f24ba8f59de36a/a033a6fabe0bfa0d"
 
       - run: |
-          images=$(crane catalog --full-ref cgr.dev | grep -v imagetest | grep -v jitsucom | grep -v kaniko | tr '\n' ' ')
+          images=$(crane catalog --full-ref cgr.dev | grep -v imagetest | grep -v jitsucom | grep -v kaniko)
           cosign verify --offline --max-workers=15 --certificate-identity="https://github.com/chainguard-images/images/.github/workflows/release.yaml@refs/heads/main" --certificate-oidc-issuer="https://token.actions.githubusercontent.com" $(expr ${images})
