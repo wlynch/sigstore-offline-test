@@ -1,0 +1,28 @@
+name: Verify Images (linear)
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write # This is needed for OIDC federation.
+
+jobs:
+  verify-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: imjasonh/setup-crane@v0.4
+      - uses: sigstore/cosign-installer@v3.8.0
+        with:
+          # Arbitrary older cosign release version. Mostly done to ensure an older built-in root that would require a TUF update.
+          cosign-release: v2.4.0
+      - uses: chainguard-dev/setup-chainctl@main
+        with:
+          # public puller identity - this just lets us list all the public images at cgr.dev/chainguard
+          identity: "720909c9f5279097d847ad02a2f24ba8f59de36a/a033a6fabe0bfa0d"
+
+      - run: |
+          images=$(crane catalog --full-ref cgr.dev | grep -v imagetest | grep -v jitsucom | grep -v kaniko)
+          cosign verify --offline --max-workers=15 --certificate-identity="https://github.com/chainguard-images/images/.github/workflows/release.yaml@refs/heads/main" --certificate-oidc-issuer="https://token.actions.githubusercontent.com" "${images}"

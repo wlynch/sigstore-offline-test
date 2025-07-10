@@ -1,0 +1,74 @@
+name: Verify Images (matrix)
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write # This is needed for OIDC federation.
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      images: ${{ steps.get-images.outputs.images }}
+    steps:
+      - uses: imjasonh/setup-crane@v0.4
+      - uses: sigstore/cosign-installer@v3.8.0
+        with:
+          # Arbitrary older cosign release version. Mostly done to ensure an older built-in root that would require a TUF update.
+          cosign-release: v2.4.0
+      - uses: chainguard-dev/setup-chainctl@main
+        with:
+          # public puller identity - this just lets us list all the public images at cgr.dev/chainguard
+          identity: "720909c9f5279097d847ad02a2f24ba8f59de36a/a033a6fabe0bfa0d"
+
+      - name: Initialize sigstore root
+        run: |
+          cosign initialize
+
+      - name: Upload sigstore root
+        uses: actions/upload-artifact@v4
+        with:
+          name: sigstore-root
+          # GitHub makes the home directory annoying to access in context, so hard code it for demo purposes.
+          path: /home/runner/.sigstore/root
+
+      - name: Get images list
+        id: get-images
+        run: |
+          images=$(crane catalog --full-ref cgr.dev | grep -v imagetest | grep -v jitsucom | grep -v kaniko | head -10)
+          echo "images=$(echo "$images" | jq -R -s -c 'split("\n")[:-1]')" >> $GITHUB_OUTPUT
+
+  verify-images:
+    runs-on: ubuntu-latest
+    needs: setup
+    strategy:
+      matrix:
+        image: ${{ fromJson(needs.setup.outputs.images) }}
+      fail-fast: false
+    steps:
+      - uses: sigstore/cosign-installer@v3.8.0
+        with:
+          # Arbitrary older cosign release version. Mostly done to ensure an older built-in root that would require a TUF update.
+          cosign-release: v2.4.0
+
+      # Mostly for demo purposes - the cosign installer action verifies the cosign binary it downloads, which ends up updating the sigstore root.
+      # This forces a reset of the sigstore root for testing.
+      - name: Clear sigstore root
+        run: |
+          rm -rf ${HOME}/.sigstore/root
+
+      # Remove this if you want to force a failure to test offline verification.
+      - name: Download sigstore root
+        uses: actions/download-artifact@v4
+        with:
+          name: sigstore-root
+          path: /home/runner/.sigstore/root
+
+      - name: Verify image
+        run: |
+          echo "Verifying ${{ matrix.image }}"
+          cosign verify --offline --certificate-identity="https://github.com/chainguard-images/images/.github/workflows/release.yaml@refs/heads/main" --certificate-oidc-issuer="https://token.actions.githubusercontent.com" "${{ matrix.image }}"
