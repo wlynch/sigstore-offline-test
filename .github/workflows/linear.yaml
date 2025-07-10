@@ -1,4 +1,4 @@
-name: Verify Images (linear)
+name: Verify Images (single)
 
 on:
   workflow_dispatch: {}
