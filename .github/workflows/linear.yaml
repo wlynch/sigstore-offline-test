@@ -25,4 +25,4 @@ jobs:
 
       - run: |
           images=$(crane catalog --full-ref cgr.dev | grep -v imagetest | grep -v jitsucom | grep -v kaniko | tr '\n' ' ')
-          cosign verify --offline --max-workers=15 --certificate-identity="https://github.com/chainguard-images/images/.github/workflows/release.yaml@refs/heads/main" --certificate-oidc-issuer="https://token.actions.githubusercontent.com" "${images}"
+          cosign verify --offline --max-workers=15 --certificate-identity="https://github.com/chainguard-images/images/.github/workflows/release.yaml@refs/heads/main" --certificate-oidc-issuer="https://token.actions.githubusercontent.com" $(expr ${images})
